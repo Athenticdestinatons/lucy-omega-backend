@@ -1,0 +1,6 @@
+*.db
+*.log
+__pycache__/
+*.pyc
+*.zip
+node_modules/
