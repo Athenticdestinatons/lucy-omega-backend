@@ -15,16 +15,17 @@ CORS(app)
 
 DB = "lucy.db"
 
-# -------------------------------
-# HARDCODED API KEYS (CEO Override)
-# -------------------------------
+# ============================================================
+# CEO OVERRIDE – Hardcoded Keys (Secure Terminal)
+# ============================================================
 DEEPSEEK_API_KEY = "sk-3a9ffec7537947e6a02bf33ad8c7faa9"
 GROK_API_KEY = "xai-u9iR2wAT4sPespxIsnadBd6tc4F2sXTQOiIE6nDRWngLdXAxlqAOEbAvTXmueXzbQPU402WKjxYt5DmJ"
 ADMIN_API_KEY = "4bd0c8ebc795a86e72856666d4aa9559ca635f1b9a21fd387a37acfc4751c81d"
+MAILERLITE_API_KEY = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI0IiwianRpIjoiZTFiZTYzNGJhNDZiYWY0ZDM2NDcxYWY2ZmVkMTZmNzkyN2I2NDE1OWUxNjY0YjkzMjdkNzMzOWFkNzg2YzI4MmU2NjM0ZjJmMWE4OGVlNTUiLCJpYXQiOjE3NzU5MjQxMTkuMzI2ODY5LCJuYmYiOjE3NzU5MjQxMTkuMzI2ODc0LCJleHAiOjQ5MzE1OTc3MTkuMzE5NjY3LCJzdWIiOiIxODM1ODE2Iiwic2NvcGVzIjpbXX0.bmWVsL90L_J7A3eqsK-TbWkbgjNZk9N3pr0CPM3Mj9L0-po8jeSIBkaF6wzmWsdz7B5TipR6t6pcxOh7AbpGnyfiuqg79gE5S4qSdz9FKnCtKRcajQ1X1MxslvLdOwIOTh2OA0VXSXp7hn5VfU_sQsxj3thnDoIWLV0b91F05AH0iq7x2k_HAJXrwMV38-YZsmXEQ8iMWW5amBaIlGWTwknEJW_WLVkXyJD0JKJzgu6uZ3pBlfbRCase2XZQ3Fi4Qqzbmsl1ffaCuu7eJKYlpXqChkIx5zg_CzMtoIC6va9RqgoW6HZVkKPldmvqCaKANBQ6eGKB9EftOHSQ4oxy_6PE9KITgd-cN7ygPlTw2HF2i7-kQZ1Ogy9boxeXxdZutBqCWXtziNHFvkDbFOtGZsPrVu1fzoyIUJpDQq5xbpo0RJIiIydzHyzO0vOyW-YrtIBt0HwDtDBEU6nU4zrwPNrmpRU0DmIQwDAWhmeXUlLJxXIY5ck_T82ezPQiD8-NThnLONiDi8UEnNzpNDLE1Gd0lGfa40GM7ucLhG7A8jfeJwtXtOGRzDhOojzcg2vQ3X733HZiXZ2SSAYVdPw_-6NPApp-rwXxtKlIzffcS_4CxQosmtPUQL_9_57W1m3WUnuLq1qcQ2Od5HKXYmXYolRiAdZxPOFkaDsfNYapVkQ"
 
-# -------------------------------
+# ============================================================
 # Database initialization
-# -------------------------------
+# ============================================================
 def init_db():
     conn = sqlite3.connect(DB)
     c = conn.cursor()
@@ -37,9 +38,46 @@ def init_db():
 
 init_db()
 
-# -------------------------------
+# ============================================================
+# MailerLite Integration
+# ============================================================
+def add_to_mailerlite(email, name=""):
+    """Add a subscriber to MailerLite group 'Lucy Influencers'"""
+    try:
+        response = requests.post(
+            "https://connect.mailerlite.com/api/subscribers",
+            headers={
+                "Authorization": f"Bearer {MAILERLITE_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "email": email,
+                "fields": {"name": name},
+                "groups": ["Lucy Influencers"]  # You can change group name
+            },
+            timeout=10
+        )
+        if response.status_code in [200, 201]:
+            print(f"✅ Added {email} to MailerLite")
+            return True
+        else:
+            print(f"MailerLite error: {response.text}")
+            return False
+    except Exception as e:
+        print(f"MailerLite exception: {e}")
+        return False
+
+def batch_import_to_mailerlite(emails):
+    """Import multiple emails to MailerLite"""
+    success = 0
+    for email in emails:
+        if add_to_mailerlite(email):
+            success += 1
+    return success
+
+# ============================================================
 # Helper functions
-# -------------------------------
+# ============================================================
 def clean_email(email):
     if not email: return None
     email = email.strip().lower()
@@ -88,9 +126,9 @@ def get_system_stats():
         "total_leads": total_leads
     }
 
-# -------------------------------
+# ============================================================
 # Public endpoints
-# -------------------------------
+# ============================================================
 @app.route("/")
 def home():
     return {"status": "Lucy Ω unified backend"}
@@ -129,6 +167,10 @@ def lucy_lead():
     c.execute("INSERT INTO processed_emails (email) VALUES (?)", (email,))
     conn.commit()
     conn.close()
+    
+    # Auto-add to MailerLite
+    add_to_mailerlite(email, name)
+    
     return jsonify({"status": "queued"}), 200
 
 @app.route("/ref", methods=["GET"])
@@ -187,9 +229,9 @@ def dashboard(code):
 def admin_stats():
     return jsonify(get_system_stats())
 
-# -------------------------------
-# Admin endpoints (hardcoded key)
-# -------------------------------
+# ============================================================
+# Admin endpoints
+# ============================================================
 def admin_required(f):
     def wrapper(*args, **kwargs):
         auth = request.headers.get("X-Admin-Key")
@@ -206,10 +248,14 @@ def admin_command():
     command = data.get("command")
     if not command:
         return jsonify({"error": "Missing command"}), 400
-    # Simple command parsing
+    
     if "stats" in command.lower():
         return jsonify({"result": get_system_stats()})
-    return jsonify({"result": f"Command '{command}' received but not implemented yet."})
+    elif "import" in command.lower() and "email" in command.lower():
+        # Example: import emails from CSV URL
+        return jsonify({"result": "Batch import function ready. Provide CSV URL."})
+    else:
+        return jsonify({"result": f"Command '{command}' received."})
 
 admin_sessions = {}
 
@@ -219,14 +265,24 @@ def admin_chat():
     data = request.get_json()
     user_message = data.get("message", "")
     session_id = data.get("session_id", "default")
+    
     if session_id not in admin_sessions:
         admin_sessions[session_id] = []
     history = admin_sessions[session_id]
     history.append({"role": "user", "content": user_message})
-
-    system_prompt = """You are Lucy_Ω, the CEO's strategic AI advisor.
-    You help with architecture decisions, project planning, operational instructions, and revenue strategy.
-    Keep responses concise and actionable."""
+    
+    stats = get_system_stats()
+    stats_text = f"\n\n[SYSTEM STATS - Current Data]\n" + \
+                 f"- Referral codes generated: {stats['referral_codes']}\n" + \
+                 f"- Commissions paid: {stats['commissions_paid']}\n" + \
+                 f"- Total commission amount: {stats['total_commission_amount']} USDT\n" + \
+                 f"- Total leads captured: {stats['total_leads']}\n"
+    
+    system_prompt = f"""You are Lucy_Ω, the CEO's strategic AI advisor.
+    You have access to the current system stats below. Use them when asked about performance, leads, or commissions.
+    Keep responses concise and actionable.
+    
+    {stats_text}"""
     
     messages = [{"role": "system", "content": system_prompt}] + history
     response = call_deepseek(messages)
@@ -235,12 +291,25 @@ def admin_chat():
     if "choices" in response:
         reply = response["choices"][0]["message"]["content"]
     else:
-        reply = "I'm having trouble connecting to my AI services. Please check the API keys."
-
+        reply = "I'm having trouble connecting to my AI services."
+    
     history.append({"role": "assistant", "content": reply})
     if len(history) > 20:
         admin_sessions[session_id] = history[-20:]
     return jsonify({"text": reply, "session_id": session_id})
+
+# ============================================================
+# Batch import endpoint (for first 200 emails)
+# ============================================================
+@app.route("/admin/import-emails", methods=["POST"])
+@admin_required
+def import_emails():
+    data = request.get_json()
+    emails = data.get("emails", [])
+    if not emails:
+        return jsonify({"error": "No emails provided"}), 400
+    success = batch_import_to_mailerlite(emails)
+    return jsonify({"imported": success, "total": len(emails)})
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
