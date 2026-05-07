@@ -156,4 +156,27 @@ app.post('/api/conversion', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
+// AI Tool endpoint (8 tools)
+app.post("/api/ai-tool", async (req, res) => {
+  const { tool, prompt } = req.body;
+  const prompts = {
+    headline: "Generate 10 unique, click‑worthy headlines for: ",
+    email: "Write a short persuasive marketing email (max 200 words) for: ",
+    youtube_title: "Generate 10 high‑CTR YouTube titles for: ",
+    script: "Write a 60‑90 second video script for: ",
+    landing_page: "Generate landing page copy (headline, subheadline, 3 benefits, CTA) for: ",
+    ad_copy: "Write 3 short ad copies (max 90 chars each) for: ",
+    affiliate_promo: "Write affiliate promotion (email, tweet, post) for: ",
+    review_writer: "Write a 300‑word affiliate review article for: "
+  };
+  const system = prompts[tool];
+  if (!system) return res.status(400).json({ error: "Unknown tool" });
+  try {
+    const result = await callAI(system + prompt, 0.7, 800);
+    res.json({ result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.listen(PORT, () => console.log(`Backend running on port ${PORT} using AI provider: ${AI_PROVIDER}`));
