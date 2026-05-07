@@ -160,6 +160,7 @@ const PORT = process.env.PORT || 3000;
 app.post("/api/ai-tool", async (req, res) => {
   const { tool, prompt } = req.body;
   const prompts = {
+    chat: "You are Lucy, an AI assistant for creators. Answer concisely and helpfully: ",
     headline: "Generate 10 unique, click‑worthy headlines for: ",
     email: "Write a short persuasive marketing email (max 200 words) for: ",
     youtube_title: "Generate 10 high‑CTR YouTube titles for: ",
